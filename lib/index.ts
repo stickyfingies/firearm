@@ -17,7 +17,6 @@ import {
 
 // @ts-ignore TSC doesn't understand Vite's ?queries
 import Backend from './physicsworker?worker';
-import zero from './physicsworker';
 import EventEmitter from 'events';
 
 export const PhysicsData = Body;
@@ -82,7 +81,7 @@ export class Physics {
     async init(events: EventEmitter, logService?: LogFn[]) {
         if (logService) [log, report] = logService;
 
-        log(`Starting at ${import.meta.url}`);
+        log(`Starting\n${import.meta.url}`);
 
         events.on(`set${PhysicsData.name}Component`, (entityId: number, body: PhysicsData) => {
             const bodyId = this.#bodyToId.get(body)!;

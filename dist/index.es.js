@@ -5578,7 +5578,8 @@ class Physics {
   async init(events, logService) {
     if (logService)
       [log, report] = logService;
-    log(`Starting at ${import.meta.url}`);
+    log(`Starting
+${import.meta.url}`);
     events.on(`set${PhysicsData.name}Component`, (entityId, body) => {
       const bodyId = this.#bodyToId.get(body);
       this.#idToEntity.set(bodyId, entityId);
