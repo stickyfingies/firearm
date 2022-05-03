@@ -6,6 +6,8 @@ const resolvePath = (str: string) => path.resolve(__dirname, str);
 
 export default defineConfig({
   build: {
+    assetsDir: '',
+    target: 'esnext',
     lib: {
       entry: resolvePath('lib/index.ts'),
       name: 'Firearm',

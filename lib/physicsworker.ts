@@ -2,6 +2,8 @@ import './ammo/ammotypes';
 // @ts-ignore - Typings don't even work lmao!
 import Ammo from './ammo/ammo.js';
 
+export default 0;
+
 const [log] = [console.log];
 
 Ammo().then((Ammo: any) => {
