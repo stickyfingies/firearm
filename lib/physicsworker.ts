@@ -1,11 +1,11 @@
-import './ammo/ammotypes';
-// @ts-ignore - Typings don't even work lmao!
-import Ammo from './ammo/ammo.js';
+import Ammo from './ammo/ammo';
 
-const [log] = [console.log];
+function log(message: any) {
+    globalThis.postMessage({ type: 'log', message });
+}
 
-Ammo().then((Ammo: any) => {
-    log('Ammo loaded');
+Ammo().then((Ammo) => {
+    log(import.meta.url);
     // I don't plan on freeing any of this memory, since these objects will
     // exist until the program's done executing so V8 will clear the memory
     // for me then anyway.
@@ -106,7 +106,6 @@ Ammo().then((Ammo: any) => {
                 const transform = new Ammo.btTransform();
 
                 const simulate = (dt: number) => {
-                    // log(dt);
                     dynamicsWorld.stepSimulation(dt);
                     for (const [id, rb] of idToRb) {
                         rb.getMotionState().getWorldTransform(transform);
@@ -124,16 +123,13 @@ Ammo().then((Ammo: any) => {
                     simulate(now - last);
                     last = now;
 
-                    // globalThis.postMessage({
-                    //     type: 'collisions',
-                    //     collisions,
-                    // });
+                    // collisions get sent inside Bullet's internal mainloop
 
                     requestAnimationFrame(mainLoop);
                 };
 
-                log('Started main loop')
                 mainLoop();
+                log('Started loop');
 
                 break;
             }
@@ -425,12 +421,11 @@ Ammo().then((Ammo: any) => {
                 break;
             }
             default: {
-                throw new Error(`[physics worker]: ${type} is not a valid command`);
+                throw new Error(`${type} is not a valid command`);
             }
         }
     };
 
     // Tell the frontend that libraries are loaded and we're ready to roll
     globalThis.postMessage({ type: 'ready' });
-    log('┍ Ready')
 });

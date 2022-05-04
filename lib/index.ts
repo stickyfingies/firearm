@@ -47,8 +47,8 @@ type RaycastCallback = (i: RaycastInfo) => void;
 type RigidBodyID = number;
 
 type LogFn = (payload: object | string | number) => void;
-let log: LogFn = console.log;
-let report: LogFn = console.error;
+let [log, report]: LogFn[] = [console.log, console.error];
+let [workerLog, workerReport]: LogFn[] = [console.log, console.error];
 
 export class Physics {
     #worker: Worker;
@@ -78,10 +78,14 @@ export class Physics {
         this.#worker = new Backend();
     }
 
-    async init(events: EventEmitter, logService?: LogFn[]) {
-        if (logService) [log, report] = logService;
+    async init(events: EventEmitter, logService?: LogFn[], workerLogService?: LogFn[]) {
+        if (logService) {
+            [log, report] = logService;
+            [workerLog, workerReport] = logService;
+        }
+        if (workerLogService) [workerLog, workerReport] = workerLogService;
 
-        log(`Starting\n${import.meta.url}`);
+        log(`${import.meta.url}`);
 
         events.on(`set${PhysicsData.name}Component`, (entityId: number, body: PhysicsData) => {
             const bodyId = this.#bodyToId.get(body)!;
@@ -92,12 +96,15 @@ export class Physics {
         });
 
         return new Promise<void>((resolve) => {
-            this.#worker.onerror = report;
+            this.#worker.onerror = workerReport;
             this.#worker.onmessage = ({ data }) => {
-                if (data === 'frogbones') log('ayye')
                 switch (data.type) {
+                    case 'log': {
+                        workerLog(data.message);
+                        break;
+                    }
                     case 'ready': {
-                        log('┕ Ready');
+                        log('Ready');
                         // This is the backend saying, "libraries loaded and ready to go!"
                         this.#worker.postMessage({ type: 'init', buffer: this.#tbuffer });
                         resolve();
@@ -130,7 +137,7 @@ export class Physics {
                         break;
                     }
                     default: {
-                        throw new Error(`[physics] unknown message type ${data.type}`);
+                        report(`Unknown message type ${data.type}`);
                     }
                 }
             };

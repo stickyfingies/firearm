@@ -948,9 +948,11 @@ else if (typeof define === 'function' && define['amd'])
 else if (typeof exports === 'object')
   exports["Ammo"] = Ammo;
 
-const [log] = [console.log];
+function log(message) {
+  globalThis.postMessage({ type: "log", message });
+}
 Ammo().then((Ammo2) => {
-  log("Ammo loaded");
+  log(self.location.href);
   const collisionConfig = new Ammo2.btDefaultCollisionConfiguration();
   const dispatcher = new Ammo2.btCollisionDispatcher(collisionConfig);
   const overlappingPairCache = new Ammo2.btDbvtBroadphase();
@@ -1030,8 +1032,8 @@ Ammo().then((Ammo2) => {
           last = now;
           requestAnimationFrame(mainLoop);
         };
-        log("Started main loop");
         mainLoop();
+        log("Started loop");
         break;
       }
       case "removeBody": {
@@ -1311,10 +1313,9 @@ Ammo().then((Ammo2) => {
         break;
       }
       default: {
-        throw new Error(`[physics worker]: ${type} is not a valid command`);
+        throw new Error(`${type} is not a valid command`);
       }
     }
   };
   globalThis.postMessage({ type: "ready" });
-  log("\u250D Ready");
 });

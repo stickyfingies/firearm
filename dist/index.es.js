@@ -5552,15 +5552,15 @@ new Vec3(); // Dispatched after the world has stepped forward in time.
 }); // Pools for unused objects
 
 function WorkerWrapper() {
-          return new Worker(new URL("./physicsworker.733825cf.js", import.meta.url), {
+          return new Worker(new URL("./physicsworker.dc30b61d.js", import.meta.url), {
   "type": "module"
 })
         }
 
 const PhysicsData = Body;
 const ConstraintData = PointToPointConstraint;
-let log = console.log;
-let report = console.error;
+let [log, report] = [console.log, console.error];
+let [workerLog, workerReport] = [console.log, console.error];
 class Physics {
   #worker;
   #idCounter = 0;
@@ -5575,11 +5575,14 @@ class Physics {
   constructor() {
     this.#worker = new WorkerWrapper();
   }
-  async init(events, logService) {
-    if (logService)
+  async init(events, logService, workerLogService) {
+    if (logService) {
       [log, report] = logService;
-    log(`Starting
-${import.meta.url}`);
+      [workerLog, workerReport] = logService;
+    }
+    if (workerLogService)
+      [workerLog, workerReport] = workerLogService;
+    log(`${import.meta.url}`);
     events.on(`set${PhysicsData.name}Component`, (entityId, body) => {
       const bodyId = this.#bodyToId.get(body);
       this.#idToEntity.set(bodyId, entityId);
@@ -5588,13 +5591,15 @@ ${import.meta.url}`);
       this.removeBody(body);
     });
     return new Promise((resolve) => {
-      this.#worker.onerror = report;
+      this.#worker.onerror = workerReport;
       this.#worker.onmessage = ({ data }) => {
-        if (data === "frogbones")
-          log("ayye");
         switch (data.type) {
+          case "log": {
+            workerLog(data.message);
+            break;
+          }
           case "ready": {
-            log("\u2515 Ready");
+            log("Ready");
             this.#worker.postMessage({ type: "init", buffer: this.#tbuffer });
             resolve();
             break;

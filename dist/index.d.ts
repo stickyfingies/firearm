@@ -26,7 +26,7 @@ declare type LogFn = (payload: object | string | number) => void;
 export declare class Physics {
     #private;
     constructor();
-    init(events: EventEmitter, logService?: LogFn[]): Promise<void>;
+    init(events: EventEmitter, logService?: LogFn[], workerLogService?: LogFn[]): Promise<void>;
     update(): void;
     registerCollisionCallback(body: Body, cb: CollisionCallback): void;
     removeCollisionCallback(body: Body): void;
