@@ -1,0 +1,4 @@
+i want to remove `cannon-es` as a dependency *enirely*.  currently, the only
+obstacle facing me is the `Body` class, which acts as a proxy between the calling
+code and the internal physics world's state.
+    My Approach: create explicit low-level functions for reading/writing transforms

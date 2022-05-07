@@ -1,5 +1,9 @@
 {
   "compilerOptions": {
+    "types": [
+      "vite/client",
+      "node"
+    ],
     "lib": [
       "WebWorker",
       "DOM",
@@ -25,5 +29,7 @@
     "resolveJsonModule": true,
     "allowJs": false,
   },
-  "include": ["lib/**/*.ts"]
+  "include": [
+    "lib/**/*.ts"
+  ]
 }

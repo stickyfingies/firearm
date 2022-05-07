@@ -1,55 +1,63 @@
-/**
- * const lmao_bats = import.meta.url.split('?')[0].split('/');
-  lmao_bats.pop();
-  console.log(lmao_bats.join('/'));
- */
-
 import { BufferGeometry } from 'three';
-import {
-    Body,
-    Box,
-    Cylinder,
-    PointToPointConstraint,
-    Quaternion,
-    Sphere,
-    Vec3,
-} from 'cannon-es';
-
-// @ts-ignore TSC doesn't understand Vite's ?queries
 import Backend from './physicsworker?worker';
 import EventEmitter from 'events';
 
-export const PhysicsData = Body;
-// eslint-disable-next-line no-redeclare
-export type PhysicsData = Body;
+/* --------------------------------- TYPES --------------------------------- */
 
-export const ConstraintData = PointToPointConstraint;
-// eslint-disable-next-line no-redeclare
-export type ConstraintData = PointToPointConstraint;
+type RigidBodyID
+    = number
+    ;
 
-export type RaycastInfo = {
-    entityID: number, // the entity hit by the raycast
-    hitPoint: Vec3 // hitpoint lcoation in worldspace
+type RaycastCallback
+    = (i: RaycastResult) => void
+    ;
+
+type LogFn
+    = (payload: object | string | number) => void
+    ;
+
+/* -------------------------------- GLOBALS -------------------------------- */
+
+let [log, report]
+    : LogFn[]
+    = [console.log, console.error]
+    ;
+
+let [workerLog, workerReport]
+    : LogFn[]
+    = [console.log, console.error]
+    ;
+
+/* ------------------------------ PUBLIC TYPES ----------------------------- */
+
+export type Vec3
+    = number[]
+    ;
+export type Quat
+    = number[]
+    ;
+export type RaycastResult
+    = {
+        entityID: number, // the entity hit by the raycast
+        hitPoint: Vec3 // hitpoint lcoation in worldspace
+    }
+    ;
+export type RigidBodyOptions
+    = {
+        pos?: Vec3,
+        scale?: Vec3,
+        quat?: Quat,
+        mass?: number,
+        fixedRotation?: boolean
+    }
+    ;
+export type CollisionCallback
+    = (entity: number) => void
+    ;
+
+export class PhysicsData {
+    constructor(public id: number) { }
 }
-
-export type RigidBodyOptions = {
-    pos?: Vec3,
-    scale?: Vec3,
-    quat?: Quaternion,
-    mass?: number,
-    fixedRotation?: boolean
-}
-
-export type CollisionCallback = (entity: number) => void;
-
-type RaycastCallback = (i: RaycastInfo) => void;
-
-type RigidBodyID = number;
-
-type LogFn = (payload: object | string | number) => void;
-let [log, report]: LogFn[] = [console.log, console.error];
-let [workerLog, workerReport]: LogFn[] = [console.log, console.error];
-
 export class Physics {
     #worker: Worker;
 
@@ -62,10 +70,6 @@ export class Physics {
     #tbuffer = new SharedArrayBuffer(4 * 16 * 1024);
 
     #tview = new Float32Array(this.#tbuffer);
-
-    #idToBody = new Map<RigidBodyID, Body>();
-
-    #bodyToId = new WeakMap<Body, RigidBodyID>();
 
     /** Map of RigidBody ID's to Entity ID's */
     #idToEntity = new Map<RigidBodyID, number>();
@@ -87,9 +91,8 @@ export class Physics {
 
         log(`${import.meta.url}`);
 
-        events.on(`set${PhysicsData.name}Component`, (entityId: number, body: PhysicsData) => {
-            const bodyId = this.#bodyToId.get(body)!;
-            this.#idToEntity.set(bodyId, entityId);
+        events.on(`set${PhysicsData.name}Component`, (entityId: number, { id }: PhysicsData) => {
+            this.#idToEntity.set(id, entityId);
         });
         events.on(`delete${PhysicsData.name}Component`, (_, body: PhysicsData) => {
             this.removeBody(body);
@@ -132,7 +135,7 @@ export class Physics {
                         const { x, y, z } = hitPoint;
                         this.#raycastCallbacks.get(raycastId)!({
                             entityID,
-                            hitPoint: new Vec3(x, y, z),
+                            hitPoint: [x, y, z],
                         });
                         break;
                     }
@@ -145,80 +148,89 @@ export class Physics {
     }
 
     update() {
-        for (const [id, body] of this.#idToBody) {
-            const offset = 3 * id;
-            body.position.x = this.#tview[offset + 0];
-            body.position.y = this.#tview[offset + 1];
-            body.position.z = this.#tview[offset + 2];
-        }
+        // for (const [id, body] of this.#idToBody) {
+        //     const offset = 3 * id;
+        //     body.position.x = this.#tview[offset + 0];
+        //     body.position.y = this.#tview[offset + 1];
+        //     body.position.z = this.#tview[offset + 2];
+        // }
     }
 
-    registerCollisionCallback(body: Body, cb: CollisionCallback) {
-        const id = this.#bodyToId.get(body)!;
+    // I Want to move away from cannon-es, so I'm trying to remove all its types.
+    // That means walking out on Vec3 and similar, so I'm using arrays to encode
+    // transform data.
+
+    // That sucks on the engine end, because functions like `distanceTo` and `vsub`
+    // aren't available anymore without wrapping the array... gross.
+    getBodyPosition({ id }: PhysicsData) {
+        const offset = 3 * id;
+        return Array.from(this.#tview.slice(offset, offset + 3));
+    }
+
+    registerCollisionCallback({ id }: PhysicsData, cb: CollisionCallback) {
         this.#collisionCallbacks.set(id, cb);
     }
 
-    removeCollisionCallback(body: Body) {
-        const id = this.#bodyToId.get(body)!;
+    removeCollisionCallback({ id }: PhysicsData) {
         this.#collisionCallbacks.delete(id);
     }
 
-    addForce(body: Body, force: Vec3) {
+    addForce({ id }: PhysicsData, force: Vec3) {
         this.#worker.postMessage({
             type: 'addForce',
-            id: this.#bodyToId.get(body),
-            x: force.x,
-            y: force.y,
-            z: force.z,
+            id,
+            x: force[0],
+            y: force[1],
+            z: force[2],
         });
     }
 
-    addForceConditionalRaycast(body: Body, force: Vec3, from: Vec3, to: Vec3) {
+    addForceConditionalRaycast({ id }: PhysicsData, force: Vec3, from: Vec3, to: Vec3) {
         this.#worker.postMessage({
             type: 'addForceConditionalRaycast',
-            id: this.#bodyToId.get(body),
-            x: force.x,
-            y: force.y,
-            z: force.z,
-            fx: from.x,
-            fy: from.y,
-            fz: from.z,
-            tx: to.x,
-            ty: to.y,
-            tz: to.z,
+            id,
+            x: force[0],
+            y: force[1],
+            z: force[2],
+            fx: from[0],
+            fy: from[1],
+            fz: from[2],
+            tx: to[0],
+            ty: to[1],
+            tz: to[2],
         });
     }
 
-    addVelocity(body: Body, velocity: Vec3) {
+    addVelocity({ id }: PhysicsData, velocity: Vec3) {
         this.#worker.postMessage({
             type: 'addVelocity',
-            id: this.#bodyToId.get(body),
-            x: velocity.x,
-            y: velocity.y,
-            z: velocity.z,
+            id,
+            x: velocity[0],
+            y: velocity[1],
+            z: velocity[2],
         });
     }
 
     /** Adds velocity to a RigidBody ONLY if raycast returns a hit */
-    addVelocityConditionalRaycast(body: Body, velocity: Vec3, from: Vec3, to: Vec3) {
+    addVelocityConditionalRaycast({ id }: PhysicsData, velocity: Vec3, from: Vec3, to: Vec3) {
         this.#worker.postMessage({
             type: 'addVelocityConditionalRaycast',
-            id: this.#bodyToId.get(body),
-            vx: velocity.x,
-            vy: velocity.y,
-            vz: velocity.z,
-            fx: from.x,
-            fy: from.y,
-            fz: from.z,
-            tx: to.x,
-            ty: to.y,
-            tz: to.z,
+            id,
+            vx: velocity[0],
+            vy: velocity[1],
+            vz: velocity[2],
+            fx: from[0],
+            fy: from[1],
+            fz: from[2],
+            tx: to[0],
+            ty: to[1],
+            tz: to[2],
         });
     }
 
     /** Casts a ray, and returns either the entity ID that got hit or undefined. */
     raycast(from: Vec3, to: Vec3) {
-        return new Promise<RaycastInfo | undefined>((resolve) => {
+        return new Promise<RaycastResult | undefined>((resolve) => {
             const id = this.#raycastIdCounter;
             this.#raycastIdCounter += 1;
 
@@ -227,30 +239,24 @@ export class Physics {
             this.#worker.postMessage({
                 type: 'raycast',
                 id,
-                fx: from.x,
-                fy: from.y,
-                fz: from.z,
-                tx: to.x,
-                ty: to.y,
-                tz: to.z,
+                fx: from[0],
+                fy: from[1],
+                fz: from[2],
+                tx: to[0],
+                ty: to[1],
+                tz: to[2],
             });
         });
     }
 
-    removeBody(body: Body) {
-        const id = this.#bodyToId.get(body)!;
-
+    removeBody({ id }: PhysicsData) {
         this.#worker.postMessage({
             type: 'removeBody',
             id,
         });
-
-        // TODO - recycle ID's, like in `graphics/graphics.ts`
-        this.#bodyToId.delete(body);
-        this.#idToBody.delete(id);
     }
 
-    createTrimesh(opts: RigidBodyOptions, geometry: BufferGeometry) {
+    createTrimesh(opts: RigidBodyOptions, geometry: BufferGeometry): PhysicsData {
         const id = this.#idCounter;
         this.#idCounter += 1;
 
@@ -264,27 +270,23 @@ export class Physics {
         this.#worker.postMessage({
             type: 'createTrimesh',
             triangleBuffer,
-            x: opts.pos?.x ?? 0,
-            y: opts.pos?.y ?? 0,
-            z: opts.pos?.z ?? 0,
-            sx: opts.scale?.x ?? 1,
-            sy: opts.scale?.y ?? 1,
-            sz: opts.scale?.z ?? 1,
-            qx: opts.quat?.x ?? 0,
-            qy: opts.quat?.y ?? 0,
-            qz: opts.quat?.z ?? 0,
-            qw: opts.quat?.w ?? 1,
+            x: opts.pos?.[0] ?? 0,
+            y: opts.pos?.[1] ?? 0,
+            z: opts.pos?.[2] ?? 0,
+            sx: opts.scale?.[0] ?? 1,
+            sy: opts.scale?.[1] ?? 1,
+            sz: opts.scale?.[2] ?? 1,
+            qx: opts.quat?.[0] ?? 0,
+            qy: opts.quat?.[1] ?? 0,
+            qz: opts.quat?.[2] ?? 0,
+            qw: opts.quat?.[3] ?? 1,
             id,
         }, []);
 
-        const mock = new Body();
-        this.#idToBody.set(id, mock);
-        this.#bodyToId.set(mock, id);
-
-        return mock;
+        return { id };
     }
 
-    createSphere(opts: RigidBodyOptions, radius: number) {
+    createSphere(opts: RigidBodyOptions, radius: number): PhysicsData {
         const id = this.#idCounter;
         this.#idCounter += 1;
 
@@ -292,28 +294,24 @@ export class Physics {
             type: 'createSphere',
             radius,
             mass: opts.mass,
-            x: opts.pos?.x ?? 0,
-            y: opts.pos?.y ?? 0,
-            z: opts.pos?.z ?? 0,
-            sx: opts.scale?.x ?? 1,
-            sy: opts.scale?.y ?? 1,
-            sz: opts.scale?.z ?? 1,
-            qx: opts.quat?.x ?? 0,
-            qy: opts.quat?.y ?? 0,
-            qz: opts.quat?.z ?? 0,
-            qw: opts.quat?.w ?? 1,
+            x: opts.pos?.[0] ?? 0,
+            y: opts.pos?.[1] ?? 0,
+            z: opts.pos?.[2] ?? 0,
+            sx: opts.scale?.[0] ?? 1,
+            sy: opts.scale?.[1] ?? 1,
+            sz: opts.scale?.[2] ?? 1,
+            qx: opts.quat?.[0] ?? 0,
+            qy: opts.quat?.[1] ?? 0,
+            qz: opts.quat?.[2] ?? 0,
+            qw: opts.quat?.[3] ?? 1,
             fixedRotation: opts.fixedRotation ?? false,
             id,
         });
 
-        const mock = new Body();
-        this.#idToBody.set(id, mock);
-        this.#bodyToId.set(mock, id);
-
-        return mock;
+        return { id };
     }
 
-    createCapsule(opts: RigidBodyOptions, radius: number, height: number) {
+    createCapsule(opts: RigidBodyOptions, radius: number, height: number): PhysicsData {
         const id = this.#idCounter;
         this.#idCounter += 1;
 
@@ -322,66 +320,20 @@ export class Physics {
             radius,
             height,
             mass: opts.mass,
-            x: opts.pos?.x ?? 0,
-            y: opts.pos?.y ?? 0,
-            z: opts.pos?.z ?? 0,
-            sx: opts.scale?.x ?? 1,
-            sy: opts.scale?.y ?? 1,
-            sz: opts.scale?.z ?? 1,
-            qx: opts.quat?.x ?? 0,
-            qy: opts.quat?.y ?? 0,
-            qz: opts.quat?.z ?? 0,
-            qw: opts.quat?.w ?? 1,
+            x: opts.pos?.[0] ?? 0,
+            y: opts.pos?.[1] ?? 0,
+            z: opts.pos?.[2] ?? 0,
+            sx: opts.scale?.[0] ?? 1,
+            sy: opts.scale?.[1] ?? 1,
+            sz: opts.scale?.[2] ?? 1,
+            qx: opts.quat?.[0] ?? 0,
+            qy: opts.quat?.[1] ?? 0,
+            qz: opts.quat?.[2] ?? 0,
+            qw: opts.quat?.[3] ?? 1,
             fixedRotation: opts.fixedRotation ?? false,
             id,
         });
 
-        const mock = new Body();
-        this.#idToBody.set(id, mock);
-        this.#bodyToId.set(mock, id);
-
-        return mock;
-    }
-
-    // ======================================
-    // Utility methods for making RigidBodies (deprecated)
-    // ======================================
-
-    /** @deprecated */
-    static makeCube(mass: number, size: number) {
-        const shape = new Box(new Vec3(size, size, size));
-        const body = new Body({ mass });
-        body.addShape(shape);
-
-        return body;
-    }
-
-    /** @deprecated */
-    static makeBall(mass: number, radius: number) {
-        const shape = new Sphere(radius);
-        const body = new Body({ mass });
-        body.addShape(shape);
-
-        return body;
-    }
-
-    /** @deprecated */
-    static makeCylinder(mass: number, radius: number, height: number) {
-        const shape = new Cylinder(radius, radius, height);
-        const body = new Body({ mass });
-        body.addShape(shape);
-
-        return body;
-    }
-
-    /** @deprecated */
-    static makeCapsule(mass: number, radius: number, height: number) {
-        const shape = new Sphere(radius);
-        const body = new Body({ mass });
-        body.addShape(shape, new Vec3(0, 0, 0));
-        body.addShape(shape, new Vec3(0, height / 2 - radius, 0));
-        body.addShape(shape, new Vec3(0, -height / 2 + radius, 0));
-
-        return body;
+        return { id };
     }
 }
