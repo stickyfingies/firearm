@@ -9,7 +9,7 @@ type RigidBodyID
     ;
 
 type RaycastCallback
-    = (i: RaycastResult) => void
+    = (i: RaycastResult | null) => void
     ;
 
 type LogFn
@@ -55,9 +55,9 @@ export type CollisionCallback
     = (entity: number) => void
     ;
 
-export class PhysicsData {
-    constructor(public id: number) { }
-}
+/* ----------------------------- PUBLIC CLASSES ---------------------------- */
+
+export class PhysicsData { constructor(public id: number) { } }
 export class Physics {
     #worker: Worker;
 
@@ -131,12 +131,18 @@ export class Physics {
                     case 'raycastResult': {
                         // Results from a raycast request
                         const { raycastId, bodyId, hitPoint } = data;
-                        const entityID = this.#idToEntity.get(bodyId)!;
-                        const { x, y, z } = hitPoint;
-                        this.#raycastCallbacks.get(raycastId)!({
-                            entityID,
-                            hitPoint: [x, y, z],
-                        });
+                        const didHit = (bodyId !== -1);
+                        if (didHit) {
+                            const entityID = this.#idToEntity.get(bodyId)!;
+                            const { x, y, z } = hitPoint;
+                            this.#raycastCallbacks.get(raycastId)!({
+                                entityID,
+                                hitPoint: [x, y, z],
+                            });
+                        }
+                        else {
+                            this.#raycastCallbacks.get(raycastId)!(null);
+                        }
                         break;
                     }
                     default: {
@@ -230,7 +236,7 @@ export class Physics {
 
     /** Casts a ray, and returns either the entity ID that got hit or undefined. */
     raycast(from: Vec3, to: Vec3) {
-        return new Promise<RaycastResult | undefined>((resolve) => {
+        return new Promise<RaycastResult | null>((resolve) => {
             const id = this.#raycastIdCounter;
             this.#raycastIdCounter += 1;
 

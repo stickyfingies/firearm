@@ -34,7 +34,7 @@ export declare class Physics {
     /** Adds velocity to a RigidBody ONLY if raycast returns a hit */
     addVelocityConditionalRaycast({ id }: PhysicsData, velocity: Vec3, from: Vec3, to: Vec3): void;
     /** Casts a ray, and returns either the entity ID that got hit or undefined. */
-    raycast(from: Vec3, to: Vec3): Promise<RaycastResult | undefined>;
+    raycast(from: Vec3, to: Vec3): Promise<RaycastResult | null>;
     removeBody({ id }: PhysicsData): void;
     createTrimesh(opts: RigidBodyOptions, geometry: BufferGeometry): PhysicsData;
     createSphere(opts: RigidBodyOptions, radius: number): PhysicsData;

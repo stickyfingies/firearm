@@ -65,12 +65,17 @@ class Physics {
           }
           case "raycastResult": {
             const { raycastId, bodyId, hitPoint } = data;
-            const entityID = this.#idToEntity.get(bodyId);
-            const { x, y, z } = hitPoint;
-            this.#raycastCallbacks.get(raycastId)({
-              entityID,
-              hitPoint: [x, y, z]
-            });
+            const didHit = bodyId !== -1;
+            if (didHit) {
+              const entityID = this.#idToEntity.get(bodyId);
+              const { x, y, z } = hitPoint;
+              this.#raycastCallbacks.get(raycastId)({
+                entityID,
+                hitPoint: [x, y, z]
+              });
+            } else {
+              this.#raycastCallbacks.get(raycastId)(null);
+            }
             break;
           }
           default: {
