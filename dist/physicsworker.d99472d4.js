@@ -1043,6 +1043,54 @@ Ammo().then((Ammo2) => {
         idToRb.delete(id);
         break;
       }
+      case "createPlane": {
+        const {
+          mass,
+          fixedRotation,
+          x,
+          y,
+          z,
+          sx,
+          sy,
+          sz,
+          qx,
+          qy,
+          qz,
+          qw,
+          id
+        } = data;
+        const origin = new Ammo2.btVector3(x, y, z);
+        const quat = new Ammo2.btQuaternion(qx, qy, qz, qw);
+        const startTransform = new Ammo2.btTransform();
+        startTransform.setIdentity();
+        startTransform.setOrigin(new Ammo2.btVector3(x, y, z));
+        startTransform.setRotation(quat);
+        const motionState = new Ammo2.btDefaultMotionState(startTransform);
+        Ammo2.destroy(startTransform);
+        Ammo2.destroy(quat);
+        Ammo2.destroy(origin);
+        const planeNormal = new Ammo2.btVector3(0, 1, 0);
+        const shape = new Ammo2.btStaticPlaneShape(planeNormal, 1);
+        Ammo2.destroy(planeNormal);
+        const localScale = new Ammo2.btVector3(sx, sy, sz);
+        shape.setLocalScaling(localScale);
+        Ammo2.destroy(localScale);
+        const localInertia = new Ammo2.btVector3(0, 0, 0);
+        shape.calculateLocalInertia(mass, localInertia);
+        const rbInfo = new Ammo2.btRigidBodyConstructionInfo(mass, motionState, shape, localInertia);
+        const body = new Ammo2.btRigidBody(rbInfo);
+        Ammo2.destroy(rbInfo);
+        Ammo2.destroy(localInertia);
+        if (fixedRotation) {
+          const angularFactor = new Ammo2.btVector3(0, 0, 0);
+          body.setAngularFactor(angularFactor);
+          Ammo2.destroy(angularFactor);
+        }
+        dynamicsWorld.addRigidBody(body);
+        body.setUserIndex(id);
+        idToRb.set(id, body);
+        break;
+      }
       case "createSphere": {
         const {
           mass,
@@ -1170,7 +1218,7 @@ Ammo().then((Ammo2) => {
           const v0 = new Ammo2.btVector3(triangles[i + 0], triangles[i + 1], triangles[i + 2]);
           const v1 = new Ammo2.btVector3(triangles[i + 3], triangles[i + 4], triangles[i + 5]);
           const v2 = new Ammo2.btVector3(triangles[i + 6], triangles[i + 7], triangles[i + 8]);
-          trimesh.addTriangle(v0, v1, v2, false);
+          trimesh.addTriangle(v0, v1, v2, true);
         }
         const shape = new Ammo2.btBvhTriangleMeshShape(trimesh, true, true);
         const localScale = new Ammo2.btVector3(sx, sy, sz);

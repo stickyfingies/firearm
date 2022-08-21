@@ -7,11 +7,9 @@ import EventEmitter from 'events';
 type RigidBodyID
     = number
     ;
-
 type RaycastCallback
     = (i: RaycastResult | null) => void
     ;
-
 type LogFn
     = (payload: object | string | number) => void
     ;
@@ -22,7 +20,6 @@ let [log, report]
     : LogFn[]
     = [console.log, console.error]
     ;
-
 let [workerLog, workerReport]
     : LogFn[]
     = [console.log, console.error]
@@ -31,13 +28,14 @@ let [workerLog, workerReport]
 /* ------------------------------ PUBLIC TYPES ----------------------------- */
 
 export type Vec3
-    = number[]
+    = [number, number, number]
     ;
 export type Quat
-    = number[]
+    = [number, number, number, number]
     ;
 export type RaycastResult
-    = {
+    =
+    {
         entityID: number, // the entity hit by the raycast
         hitPoint: Vec3 // hitpoint lcoation in worldspace
     }
@@ -52,7 +50,8 @@ export type RigidBodyOptions
     }
     ;
 export type CollisionCallback
-    = (entity: number) => void
+    =
+    (entity: number) => void
     ;
 
 /* ----------------------------- PUBLIC CLASSES ---------------------------- */
@@ -168,9 +167,9 @@ export class Physics {
 
     // That sucks on the engine end, because functions like `distanceTo` and `vsub`
     // aren't available anymore without wrapping the array... gross.
-    getBodyPosition({ id }: PhysicsData) {
+    getBodyPosition({ id }: PhysicsData): Vec3 {
         const offset = 3 * id;
-        return Array.from(this.#tview.slice(offset, offset + 3));
+        return Array.from(this.#tview.slice(offset, offset + 3)) as Vec3;
     }
 
     registerCollisionCallback({ id }: PhysicsData, cb: CollisionCallback) {
@@ -292,13 +291,12 @@ export class Physics {
         return { id };
     }
 
-    createSphere(opts: RigidBodyOptions, radius: number): PhysicsData {
+    createPlane(opts: RigidBodyOptions) {
         const id = this.#idCounter;
         this.#idCounter += 1;
 
         this.#worker.postMessage({
-            type: 'createSphere',
-            radius,
+            type: 'createPlane',
             mass: opts.mass,
             x: opts.pos?.[0] ?? 0,
             y: opts.pos?.[1] ?? 0,
@@ -317,14 +315,39 @@ export class Physics {
         return { id };
     }
 
-    createCapsule(opts: RigidBodyOptions, radius: number, height: number): PhysicsData {
+    createSphere(opts: RigidBodyOptions & { radius: number }): PhysicsData {
+        const id = this.#idCounter;
+        this.#idCounter += 1;
+
+        this.#worker.postMessage({
+            type: 'createSphere',
+            radius: opts.radius,
+            mass: opts.mass,
+            x: opts.pos?.[0] ?? 0,
+            y: opts.pos?.[1] ?? 0,
+            z: opts.pos?.[2] ?? 0,
+            sx: opts.scale?.[0] ?? 1,
+            sy: opts.scale?.[1] ?? 1,
+            sz: opts.scale?.[2] ?? 1,
+            qx: opts.quat?.[0] ?? 0,
+            qy: opts.quat?.[1] ?? 0,
+            qz: opts.quat?.[2] ?? 0,
+            qw: opts.quat?.[3] ?? 1,
+            fixedRotation: opts.fixedRotation ?? false,
+            id,
+        });
+
+        return { id };
+    }
+
+    createCapsule(opts: RigidBodyOptions & { radius: number, height: number }): PhysicsData {
         const id = this.#idCounter;
         this.#idCounter += 1;
 
         this.#worker.postMessage({
             type: 'createCapsule',
-            radius,
-            height,
+            radius: opts.radius,
+            height: opts.height,
             mass: opts.mass,
             x: opts.pos?.[0] ?? 0,
             y: opts.pos?.[1] ?? 0,

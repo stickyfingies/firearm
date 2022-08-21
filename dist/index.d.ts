@@ -2,8 +2,8 @@
 import { BufferGeometry } from 'three';
 import EventEmitter from 'events';
 declare type LogFn = (payload: object | string | number) => void;
-export declare type Vec3 = number[];
-export declare type Quat = number[];
+export declare type Vec3 = [number, number, number];
+export declare type Quat = [number, number, number, number];
 export declare type RaycastResult = {
     entityID: number;
     hitPoint: Vec3;
@@ -37,7 +37,15 @@ export declare class Physics {
     raycast(from: Vec3, to: Vec3): Promise<RaycastResult | null>;
     removeBody({ id }: PhysicsData): void;
     createTrimesh(opts: RigidBodyOptions, geometry: BufferGeometry): PhysicsData;
-    createSphere(opts: RigidBodyOptions, radius: number): PhysicsData;
-    createCapsule(opts: RigidBodyOptions, radius: number, height: number): PhysicsData;
+    createPlane(opts: RigidBodyOptions): {
+        id: number;
+    };
+    createSphere(opts: RigidBodyOptions & {
+        radius: number;
+    }): PhysicsData;
+    createCapsule(opts: RigidBodyOptions & {
+        radius: number;
+        height: number;
+    }): PhysicsData;
 }
 export {};

@@ -141,6 +141,60 @@ Ammo().then((Ammo) => {
                 idToRb.delete(id);
                 break;
             }
+            case 'createPlane': {
+                const {
+                    mass, fixedRotation, x, y, z, sx, sy, sz, qx, qy, qz, qw, id,
+                } = data;
+
+                // transform (motion state)
+                const origin = new Ammo.btVector3(x, y, z);
+                const quat = new Ammo.btQuaternion(qx, qy, qz, qw);
+                const startTransform = new Ammo.btTransform();
+                startTransform.setIdentity();
+                startTransform.setOrigin(new Ammo.btVector3(x, y, z));
+                startTransform.setRotation(quat);
+                const motionState = new Ammo.btDefaultMotionState(startTransform);
+                Ammo.destroy(startTransform);
+                Ammo.destroy(quat);
+                Ammo.destroy(origin);
+
+                // shape
+                const planeNormal = new Ammo.btVector3(0, 1, 0);
+                const shape = new Ammo.btStaticPlaneShape(planeNormal, 1);
+                Ammo.destroy(planeNormal);
+
+                // scale shape
+                const localScale = new Ammo.btVector3(sx, sy, sz);
+                shape.setLocalScaling(localScale);
+                Ammo.destroy(localScale);
+
+                // RigidBody w/ inertia calculated
+                const localInertia = new Ammo.btVector3(0, 0, 0);
+                shape.calculateLocalInertia(mass, localInertia);
+                const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+                    mass,
+                    motionState,
+                    shape,
+                    localInertia,
+                );
+                const body = new Ammo.btRigidBody(rbInfo);
+                Ammo.destroy(rbInfo);
+                Ammo.destroy(localInertia);
+
+                if (fixedRotation) {
+                    const angularFactor = new Ammo.btVector3(0, 0, 0);
+                    body.setAngularFactor(angularFactor);
+                    Ammo.destroy(angularFactor);
+                }
+
+                dynamicsWorld.addRigidBody(body);
+                body.setUserIndex(id);
+                idToRb.set(id, body);
+
+                // Memory left to be freed: RigidBody, shapes, motionState
+
+                break;
+            }
             case 'createSphere': {
                 const {
                     mass, fixedRotation, radius, x, y, z, sx, sy, sz, qx, qy, qz, qw, id,
@@ -266,7 +320,7 @@ Ammo().then((Ammo) => {
                     // hull.addPoint(v1, true);
                     const v2 = new Ammo.btVector3(triangles[i + 6], triangles[i + 7], triangles[i + 8]);
                     // hull.addPoint(v2, true);
-                    trimesh.addTriangle(v0, v1, v2, false);
+                    trimesh.addTriangle(v0, v1, v2, true);
                 }
 
                 const shape = new Ammo.btBvhTriangleMeshShape(trimesh, true, true);
@@ -396,6 +450,7 @@ Ammo().then((Ammo) => {
 
                 const src = new Ammo.btVector3(fx, fy, fz);
                 const dst = new Ammo.btVector3(tx, ty, tz);
+                // there's different kinds of callbakcs you can use
                 const res = new Ammo.ClosestRayResultCallback(src, dst);
                 dynamicsWorld.rayTest(src, dst, res);
                 Ammo.destroy(dst);

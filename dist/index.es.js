@@ -1,5 +1,5 @@
 function WorkerWrapper() {
-          return new Worker(new URL("./physicsworker.dc30b61d.js", import.meta.url), {
+          return new Worker(new URL("./physicsworker.d99472d4.js", import.meta.url), {
   "type": "module"
 })
         }
@@ -191,12 +191,11 @@ class Physics {
     }, []);
     return { id };
   }
-  createSphere(opts, radius) {
+  createPlane(opts) {
     const id = this.#idCounter;
     this.#idCounter += 1;
     this.#worker.postMessage({
-      type: "createSphere",
-      radius,
+      type: "createPlane",
       mass: opts.mass,
       x: opts.pos?.[0] ?? 0,
       y: opts.pos?.[1] ?? 0,
@@ -213,13 +212,35 @@ class Physics {
     });
     return { id };
   }
-  createCapsule(opts, radius, height) {
+  createSphere(opts) {
+    const id = this.#idCounter;
+    this.#idCounter += 1;
+    this.#worker.postMessage({
+      type: "createSphere",
+      radius: opts.radius,
+      mass: opts.mass,
+      x: opts.pos?.[0] ?? 0,
+      y: opts.pos?.[1] ?? 0,
+      z: opts.pos?.[2] ?? 0,
+      sx: opts.scale?.[0] ?? 1,
+      sy: opts.scale?.[1] ?? 1,
+      sz: opts.scale?.[2] ?? 1,
+      qx: opts.quat?.[0] ?? 0,
+      qy: opts.quat?.[1] ?? 0,
+      qz: opts.quat?.[2] ?? 0,
+      qw: opts.quat?.[3] ?? 1,
+      fixedRotation: opts.fixedRotation ?? false,
+      id
+    });
+    return { id };
+  }
+  createCapsule(opts) {
     const id = this.#idCounter;
     this.#idCounter += 1;
     this.#worker.postMessage({
       type: "createCapsule",
-      radius,
-      height,
+      radius: opts.radius,
+      height: opts.height,
       mass: opts.mass,
       x: opts.pos?.[0] ?? 0,
       y: opts.pos?.[1] ?? 0,
